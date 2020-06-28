@@ -243,11 +243,12 @@ public class NativeLibrary {
             // Search framework libraries on OS X
             else if (Platform.isMac() && !libraryName.endsWith(".dylib")) {
                 LOG.log(DEBUG_LOAD_LEVEL, "Looking for matching frameworks");
-                libraryPath = matchFramework(libraryName);
-                if (libraryPath != null) {
+                for(String frameworkName : matchFramework(libraryName)) {
+                    libraryName = frameworkName;
                     try {
                         LOG.log(DEBUG_LOAD_LEVEL, "Trying " + libraryPath);
-                        handle = Native.open(libraryPath, openFlags);
+                        handle = Native.open(libraryName, openFlags);
+                        break;
                     }
                     catch(UnsatisfiedLinkError e2) {
                         LOG.log(DEBUG_LOAD_LEVEL, "Loading failed with message: " + e2.getMessage());
@@ -339,16 +340,16 @@ public class NativeLibrary {
     }
 
     /** Look for a matching framework (OSX) */
-    static String matchFramework(String libraryName) {
+    static String[] matchFramework(String libraryName) {
+        Set<String> paths = new HashSet<String>();
         File framework = new File(libraryName);
         if (framework.isAbsolute()) {
-            if (libraryName.indexOf(".framework") != -1
-                && framework.exists()) {
-                return framework.getAbsolutePath();
+            if (libraryName.indexOf(".framework") != -1) {
+                paths.add(framework.getAbsolutePath());
             }
-            framework = new File(new File(framework.getParentFile(), framework.getName() + ".framework"), framework.getName());
-            if (framework.exists()) {
-                return framework.getAbsolutePath();
+            else {
+                framework = new File(new File(framework.getParentFile(), framework.getName() + ".framework"), framework.getName());
+                paths.add(framework.getAbsolutePath());
             }
         }
         else {
@@ -357,12 +358,10 @@ public class NativeLibrary {
                 ? libraryName + ".framework/" + libraryName : libraryName;
             for (int i=0;i < PREFIXES.length;i++) {
                 String libraryPath = PREFIXES[i] + "/Library/Frameworks/" + suffix;
-                if (new File(libraryPath).exists()) {
-                    return libraryPath;
-                }
+                paths.add(libraryPath);
             }
         }
-        return null;
+        return paths.toArray(new String[paths.size()]);
     }
 
     private String getLibraryName(String libraryName) {
